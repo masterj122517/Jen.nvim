@@ -53,6 +53,7 @@ end
 
 local function prompt_password()
   local password = vim.fn.inputsecret("password: ")
+  password = password:gsub("%s+$", "")
   if password == "" then
     notify("password is required", vim.log.levels.ERROR)
     return nil
@@ -88,9 +89,22 @@ function M.encrypt_in_place()
     return
   end
 
-  run_jen({ "encrypt", path, path }, password, function()
+  local temp_path = vim.fn.tempname()
+  run_jen({ "encrypt", path, temp_path }, password, function()
+    local renamed = vim.fn.rename(temp_path, path) == 0
+    if not renamed then
+      vim.fn.delete(temp_path)
+      notify("failed to replace file after encryption", vim.log.levels.ERROR)
+      return
+    end
     notify("encrypted in place")
-    vim.cmd("edit")
+    vim.cmd("edit ++bin")
+    vim.bo.binary = true
+    vim.bo.readonly = true
+    vim.bo.modifiable = false
+    vim.bo.swapfile = false
+    vim.bo.undofile = false
+    vim.bo.modified = false
   end)
 end
 
@@ -141,6 +155,10 @@ function M.decrypt_in_place()
     file:close()
     notify("decrypted in place")
     vim.cmd("edit")
+    vim.bo.binary = false
+    vim.bo.readonly = false
+    vim.bo.modifiable = true
+    vim.bo.modified = false
   end)
 end
 
