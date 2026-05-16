@@ -77,6 +77,23 @@ function M.encrypt_current()
   end)
 end
 
+function M.encrypt_in_place()
+  local path = get_current_path()
+  if not path then
+    return
+  end
+  ensure_saved()
+  local password = prompt_password()
+  if not password then
+    return
+  end
+
+  run_jen({ "encrypt", path, path }, password, function()
+    notify("encrypted in place")
+    vim.cmd("edit")
+  end)
+end
+
 local function decrypt_output_name(path)
   if path:sub(-4) == ".enc" then
     return path:sub(1, -5) .. ".dec"
@@ -104,8 +121,31 @@ function M.decrypt_current()
   end)
 end
 
+function M.decrypt_in_place()
+  local path = get_current_path()
+  if not path then
+    return
+  end
+  local password = prompt_password()
+  if not password then
+    return
+  end
+
+  run_jen({ "decrypt", path }, password, function(output)
+    local file = io.open(path, "wb")
+    if not file then
+      notify("failed to open file for writing", vim.log.levels.ERROR)
+      return
+    end
+    file:write(output)
+    file:close()
+    notify("decrypted in place")
+    vim.cmd("edit")
+  end)
+end
+
 function M.command(opts)
-  local action = (opts.fargs[1] or ""):lower()
+  local action = (opts.fargs[1] or ""):lower():gsub("%s+", "")
   if action == "e" then
     M.encrypt_current()
     return
@@ -114,7 +154,15 @@ function M.command(opts)
     M.decrypt_current()
     return
   end
-  notify("unknown action: use e or d", vim.log.levels.ERROR)
+  if action == "es" then
+    M.encrypt_in_place()
+    return
+  end
+  if action == "ds" then
+    M.decrypt_in_place()
+    return
+  end
+  notify("unknown action: use e, d, es, or ds", vim.log.levels.ERROR)
 end
 
 return M
